@@ -129,18 +129,16 @@ function printSummary() {
 
 <template>
   <div class="portal">
-    <header class="portal-head no-print">
-      <div class="brand">
-        <img src="/logo.png" alt="" />
-        <div><b>BIMMERMONKEYS</b><small>Customer service portal</small></div>
-      </div>
-      <div class="row">
-        <ThemeToggle />
-        <router-link class="btn sm" to="/login">Staff sign in ›</router-link>
-      </div>
-    </header>
-
     <main class="portal-main">
+      <div class="masthead no-print">
+        <img src="/logo.png" alt="Bimmermonkeys" class="logo" />
+        <b class="wordmark">BIMMERMONKEYS</b>
+        <div class="row" style="gap: 6px">
+          <router-link class="btn sm ghost" to="/login">Staff sign in ›</router-link>
+          <ThemeToggle />
+        </div>
+      </div>
+
       <section v-if="!result" class="hero no-print">
         <h1>Check your vehicle's service history</h1>
         <p class="lead">See every visit, what was found, the parts and labor you were charged for, and the photos and videos our technicians took — anytime.</p>
@@ -322,12 +320,13 @@ function printSummary() {
 
 <style scoped>
 .portal { min-height: 100vh; display: flex; flex-direction: column; }
-.portal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 28px; border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; z-index: 5; }
-.portal-head .brand { padding: 0; }
+.masthead { display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 10px; }
+.masthead .logo { width: 96px; height: 96px; border-radius: 22px; background: #000; }
+.wordmark { font-size: 18px; letter-spacing: 0.22em; }
 .portal-main { flex: 1; width: min(1100px, 100%); margin: 0 auto; padding: 28px 20px 60px; }
 .portal-foot { text-align: center; font-size: 11px; color: var(--text-dim); padding: 18px; border-top: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.06em; }
 
-.hero h1 { font-size: 30px; text-align: center; margin-top: 18px; }
+.hero h1 { font-size: 30px; text-align: center; margin-top: 22px; }
 .lead { text-align: center; color: var(--text-muted); max-width: 640px; margin: 10px auto 26px; font-size: 15px; }
 .lookup { max-width: 860px; margin: 0 auto; }
 /* Labels, inputs and help text sit on three shared baselines regardless of how long each help text runs. */
@@ -391,7 +390,6 @@ function printSummary() {
   .lookup-btn { margin-top: 0; width: 100%; }
   .lookup .help { min-height: 0; }
   .hero h1 { font-size: 24px; }
-  .portal-head { padding: 12px 16px; }
 }
 @media print {
   .no-print { display: none !important; }
