@@ -130,19 +130,6 @@ const closeWindow = () => window.close();
         <div class="band">CUSTOMER COMPLAINT</div>
         <table class="form"><tbody><tr><td class="val notes">{{ j.complaints.join(', ') || '—' }}</td></tr></tbody></table>
 
-        <div class="band">REPAIRS EXECUTED</div>
-        <table class="form">
-          <colgroup><col style="width: 7%" /><col style="width: 93%" /></colgroup>
-          <tbody>
-            <tr class="head"><td>#</td><td>REPAIR / SERVICE PERFORMED</td></tr>
-            <tr v-for="(line, i) in j.repairs.length ? j.repairs : j.charges.map((c) => c.name)" :key="i">
-              <td class="val nw">{{ i + 1 }}</td>
-              <td class="val left">{{ line }}</td>
-            </tr>
-            <tr v-if="!j.repairs.length && !j.charges.length"><td colspan="2" class="val muted">NONE RECORDED</td></tr>
-          </tbody>
-        </table>
-
         <div class="band">REPORTS &amp; FINDINGS</div>
         <table class="form">
           <colgroup><col style="width: 70%" /><col style="width: 30%" /></colgroup>

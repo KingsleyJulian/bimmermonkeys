@@ -6,7 +6,6 @@ import { signedUrl, supabase } from '@/lib/supabase';
 import { fmtDate, fmtMoney, statusLabel } from '@/lib/format';
 import { INSPECTION_GROUPS } from '@/lib/inspection';
 import { toast } from '@/lib/toast';
-import { useAuth } from '@/stores/auth';
 
 /**
  * Printable job-order forms: one bordered sheet, blue section bands, bold label cells,
@@ -36,7 +35,6 @@ type Media = { id: string; kind: string; storage_path: string | null; thumbnail_
 const route = useRoute();
 const kind = route.params.kind as Kind;
 const id = route.params.id as string;
-const auth = useAuth();
 
 const jo = ref<Jo | null>(null);
 const inspection = ref<Insp[]>([]);
@@ -53,44 +51,6 @@ const includeParts = ref(route.query.parts !== '0');
 const docNumber = ref<number | null>(null);
 const printedAt = ref(new Date());
 
-/**
- * "Repairs executed" on the billing documents. Lines typed on this page are stored in
- * job_order_repairs and win; otherwise the labor charges are listed.
- */
-const savedRepairs = ref<string[]>([]);
-const chargeRepairs = computed(() => charges.value.map((c) => `${c.name}${c.quantity !== 1 ? ` × ${c.quantity} ${c.unit.replace('PER ', '')}` : ''}`));
-const repairs = computed(() => (savedRepairs.value.length ? savedRepairs.value : chargeRepairs.value));
-const editRepairs = ref(false);
-const repairsText = ref('');
-const savingRepairs = ref(false);
-function openRepairsEditor() {
-  repairsText.value = repairs.value.join('\n');
-  editRepairs.value = true;
-}
-async function saveRepairs() {
-  const lines = repairsText.value.split('\n').map((l) => l.trim().toUpperCase()).filter(Boolean);
-  if (!lines.length) return toast.error('Type at least one repair line');
-  savingRepairs.value = true;
-  try {
-    const who = auth.profile?.display_name ?? 'ADMIN';
-    const now = new Date().toISOString();
-    const old = savedRepairs.value.join(' | ') || null;
-    const del = await supabase.from('job_order_repairs').delete().eq('job_order_id', id);
-    if (del.error) throw new Error(del.error.message);
-    const ins = await supabase.from('job_order_repairs').insert(lines.map((description, i) => ({ job_order_id: id, line_no: i + 1, description, created_by: auth.profile?.id ?? null, created_by_name: who, created_at: now })));
-    if (ins.error) throw new Error(ins.error.message);
-    // History trail on the job order + the console audit trail.
-    await supabase.from('reports').insert({ id: crypto.randomUUID(), job_order_id: id, body: `REPAIRS EXECUTED:\n${lines.map((l) => `- ${l}`).join('\n')}`, author_user_id: auth.profile?.id ?? null, author_name: who, created_at: now });
-    await supabase.from('job_order_audit').insert({ job_order_id: id, jo_number: jo.value?.jo_number ?? null, action: 'repairs_executed', old_value: old, new_value: lines.join(' | '), changed_by: auth.profile?.id ?? null, changed_by_name: who });
-    savedRepairs.value = lines;
-    editRepairs.value = false;
-    toast.success('Repairs saved to the job order history');
-  } catch (e) {
-    toast.error((e as Error).message);
-  } finally {
-    savingRepairs.value = false;
-  }
-}
 
 const byKey = computed(() => new Map(inspection.value.map((i) => [i.item_key, i])));
 const activeParts = computed(() => parts.value.filter((p) => kind === 'parts-request' || p.status !== 'CANCELLED'));
@@ -121,7 +81,7 @@ const stateMark = (s?: string) => (s === 'ok' ? '✓ OK' : s === 'not_ok' ? '✗
 const ITEM_LABELS = new Map(INSPECTION_GROUPS.flatMap((g) => g.items.map((i) => [i.key, i.label] as const)));
 
 onMounted(async () => {
-  const [j, i, c, p, ch, s, g, sl, m, rr] = await Promise.all([
+  const [j, i, c, p, ch, s, g, sl, m] = await Promise.all([
     supabase.from('job_orders').select('*, vehicles(*), customers(*)').eq('id', id).maybeSingle(),
     supabase.from('inspection_items').select('item_key, state, quantity, remark').eq('job_order_id', id),
     supabase.from('complaints').select('keyword').eq('job_order_id', id).order('position'),
@@ -131,9 +91,7 @@ onMounted(async () => {
     supabase.from('document_signatories').select('label, name').eq('document_kind', KIND_TO_DB[kind]).order('sort_order'),
     supabase.from('job_order_status_log').select('new_status, changed_at').eq('job_order_id', id).in('new_status', ['COMPLETED', 'RELEASED']).order('changed_at', { ascending: false }).limit(1),
     supabase.from('media_attachments').select('id, kind, storage_path, thumbnail_path, captured_at, captured_by_name, inspection_item_key, report_id').eq('job_order_id', id).eq('kind', 'image').order('sort_order'),
-    supabase.from('job_order_repairs').select('description').eq('job_order_id', id).order('line_no'),
   ]);
-  savedRepairs.value = ((rr.data as { description: string }[]) ?? []).map((r) => r.description);
   jo.value = j.data as unknown as Jo;
   inspection.value = (i.data as Insp[]) ?? [];
   complaints.value = ((c.data as { keyword: string }[]) ?? []).map((x) => x.keyword);
@@ -183,17 +141,7 @@ const closeWindow = () => window.close();
         <label v-if="photos.length" class="row" style="gap: 6px; font-size: 12px; color: var(--text)"><input v-model="includePhotos" type="checkbox" /> PHOTO PAGE ({{ photos.length }})</label>
       </div>
       <div class="row">
-        <button v-if="kind === 'invoice' || kind === 'sales-invoice'" class="btn sm" :class="{ primary: editRepairs }" @click="editRepairs ? (editRepairs = false) : openRepairsEditor()">✎ Type repairs executed</button>
         <button class="btn sm" @click="adHoc.push({ label: '', name: '' })">+ Add signatory</button>
-      </div>
-    </div>
-    <div v-if="editRepairs" class="no-print card" style="margin: 0 24px 12px">
-      <h3>Repairs executed · one per line</h3>
-      <p class="help">Pre-filled from the labor charges. Whatever you save here prints on the invoice, is appended to the job order history and logged in the audit trail.</p>
-      <textarea v-model="repairsText" class="input" rows="6" style="width: 100%; text-transform: uppercase" @input="repairsText = repairsText.toUpperCase()" />
-      <div class="row end mt">
-        <button class="btn sm ghost" @click="editRepairs = false">Cancel</button>
-        <button class="btn sm primary" :disabled="savingRepairs" @click="saveRepairs">{{ savingRepairs ? 'Saving…' : 'Save repairs' }}</button>
       </div>
     </div>
     <div v-if="adHoc.length" class="no-print card" style="margin: 0 24px 12px">
@@ -281,22 +229,6 @@ const closeWindow = () => window.close();
             </tbody>
           </table>
         </template>
-      </template>
-
-      <!-- Repairs are only reported on the billing documents (FOR PAYMENT stage). -->
-      <template v-if="kind === 'invoice' || kind === 'sales-invoice'">
-        <div class="band">REPAIRS EXECUTED</div>
-        <table class="form">
-          <colgroup><col style="width: 7%" /><col style="width: 93%" /></colgroup>
-          <tbody>
-            <tr class="head"><td>#</td><td>REPAIR / SERVICE PERFORMED</td></tr>
-            <tr v-for="(line, i) in repairs" :key="i">
-              <td class="val nw">{{ i + 1 }}</td>
-              <td class="val left">{{ line }}</td>
-            </tr>
-            <tr v-if="!repairs.length"><td colspan="2" class="val notes blank" /></tr>
-          </tbody>
-        </table>
       </template>
 
       <template v-if="showParts">

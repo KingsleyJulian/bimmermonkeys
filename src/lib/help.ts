@@ -156,10 +156,10 @@ export const HELP: Record<string, HelpTopic> = {
   },
   audit: {
     title: 'Audit trail',
-    intro: 'Who changed what, when. Inventory changes (price, stock, name, photo) and job order actions (repairs typed on invoices).',
+    intro: 'Who changed what, when. Inventory changes (price, stock, name, photo) and job order actions (hand-written part requests matched to the catalogue).',
     actions: [
       { label: 'Filters', text: 'Part number, field, source (manual = edited here, import = spreadsheet, install = stock consumed by a part request) and person.' },
-      { label: 'Job orders', text: 'Switch to the job order log to see repairs-executed text saved from the print page and other console actions on a job order.' },
+      { label: 'Job orders', text: 'Switch to the job order log to see console actions on a job order, such as a hand-written part request matched to a catalogue part.' },
       { label: '⇩ Export Excel', text: 'Downloads the filtered trail.' },
     ],
   },
@@ -180,7 +180,6 @@ export const HELP: Record<string, HelpTopic> = {
       { label: 'Print / Save PDF', text: 'Assigns the document number on first print (invoices and parts requests) and opens the print dialog.' },
       { label: 'Include parts', text: 'Service Invoice only: toggle the parts section on or off (on by default).' },
       { label: 'Photo page', text: 'Intake checklist: adds the Visual Inspection Report page with the intake photos.' },
-      { label: 'Type repairs executed', text: 'Invoices: the Repairs Executed list is taken from the labor charges, or you can type it freehand here. Saved text prints on the invoice, is appended to the job order history and logged in the audit trail.' },
       { label: '+ Add signatory', text: 'Adds a signature line for this print only. Permanent extra signatories live in Settings.' },
     ],
   },

@@ -2,7 +2,6 @@
 import { computed, ref } from 'vue';
 import { supabase } from '@/lib/supabase';
 import { fmtDate, fmtMoney, statusLabel, statusTone } from '@/lib/format';
-import { exportWorkbookSheets } from '@/lib/sheets';
 import ThemeToggle from '@/components/ThemeToggle.vue';
 import { INSPECTION_GROUPS } from '@/lib/inspection';
 import { PORTAL_STATEMENT_KEY, type PortalJo, type PortalMedia, type PortalResult } from '@/lib/portal';
@@ -71,50 +70,6 @@ function reset() {
   vin.value = '';
 }
 
-/** Excel summary: one sheet per concern, plus a chronological audit trail of everything done to the vehicle. */
-function downloadSummary() {
-  if (!result.value) return;
-  const v = result.value.vehicle;
-  const jos = result.value.jobOrders;
-  const stamp = new Date().toISOString().slice(0, 10);
-  const timeline: { When: string; 'Job Order': string; Event: string; Detail: string; By: string }[] = [];
-  for (const j of jos) {
-    timeline.push({ When: fmtDate(j.created_at), 'Job Order': j.jo_number, Event: 'VEHICLE RECEIVED', Detail: `${j.category} · ${j.entry_type.replace('_', ' ')} · ${j.odometer_km.toLocaleString()} KM · ${j.complaints.join(', ')}`, By: j.technician ?? '' });
-    for (const l of j.status_log) timeline.push({ When: fmtDate(l.changed_at), 'Job Order': j.jo_number, Event: `STATUS → ${statusLabel(l.new_status).toUpperCase()}`, Detail: l.old_status ? `FROM ${statusLabel(l.old_status).toUpperCase()}` : '', By: l.changed_by_name ?? '' });
-    for (const r of j.reports) timeline.push({ When: fmtDate(r.created_at), 'Job Order': j.jo_number, Event: 'REPORT', Detail: r.body, By: r.author_name ?? '' });
-    for (const p of j.parts) {
-      timeline.push({ When: fmtDate(p.requested_at), 'Job Order': j.jo_number, Event: 'PART REQUESTED', Detail: `${p.part_number} ${p.part_name} × ${p.quantity}`, By: p.requested_by_name ?? '' });
-      if (p.installed_at) timeline.push({ When: fmtDate(p.installed_at), 'Job Order': j.jo_number, Event: 'PART INSTALLED', Detail: `${p.part_number} ${p.part_name} × ${p.quantity} · ₱${fmtMoney(p.amount)}`, By: '' });
-    }
-    for (const c of j.charges) timeline.push({ When: fmtDate(c.created_at), 'Job Order': j.jo_number, Event: 'LABOR CHARGED', Detail: `${c.name} · ${c.quantity} ${c.unit} × ₱${fmtMoney(c.unit_amount)} = ₱${fmtMoney(c.total)}`, By: c.added_by_name ?? '' });
-    for (const a of j.audit) timeline.push({ When: fmtDate(a.at), 'Job Order': j.jo_number, Event: a.action.replace(/_/g, ' ').toUpperCase(), Detail: a.value ?? '', By: a.by ?? '' });
-  }
-  timeline.sort((a, b) => a.When.localeCompare(b.When));
-  exportWorkbookSheets(`${v.plate}-service-summary-${stamp}.xlsx`, [
-    {
-      name: 'Summary',
-      rows: [
-        { Field: 'Plate', Value: v.plate }, { Field: 'Vehicle', Value: `${v.make} ${v.model} ${v.year ?? ''}`.trim() }, { Field: 'Color', Value: v.color }, { Field: 'VIN', Value: v.vin }, { Field: 'Engine No.', Value: v.engine_no },
-        { Field: 'Visits', Value: totals.value.visits }, { Field: 'Parts total (₱)', Value: totals.value.parts }, { Field: 'Labor total (₱)', Value: totals.value.labor }, { Field: 'Grand total (₱)', Value: totals.value.grand },
-        { Field: 'Generated', Value: fmtDate(result.value.generated_at) },
-      ],
-    },
-    {
-      name: 'Job Orders',
-      rows: jos.map((j) => ({ 'Job Order': j.jo_number, Date: fmtDate(j.created_at), Status: statusLabel(j.status), Category: j.category, Entry: j.entry_type.replace('_', ' '), 'Odometer (KM)': j.odometer_km, Technician: j.technician ?? '', Complaint: j.complaints.join(', '), 'Repairs executed': j.repairs.join(' | '), Finished: j.finished_at ? fmtDate(j.finished_at) : '', Released: j.released_at ? fmtDate(j.released_at) : '', 'Parts (₱)': partsTotal(j), 'Labor (₱)': laborTotal(j), 'Total (₱)': partsTotal(j) + laborTotal(j) })),
-    },
-    {
-      name: 'Parts',
-      rows: jos.flatMap((j) => j.parts.map((p) => ({ 'Job Order': j.jo_number, 'Part Number': p.part_number, 'Part Name': p.part_name, Qty: p.quantity, Status: p.status, 'Unit Price (₱)': p.unit_price ?? '', 'Amount (₱)': p.amount, 'Requested By': p.requested_by_name ?? '', Requested: fmtDate(p.requested_at), Installed: p.installed_at ? fmtDate(p.installed_at) : '' }))),
-    },
-    {
-      name: 'Labor',
-      rows: jos.flatMap((j) => j.charges.map((c) => ({ 'Job Order': j.jo_number, Service: c.name, Qty: c.quantity, Unit: c.unit, 'Unit Amount (₱)': c.unit_amount, 'Total (₱)': c.total, 'Charged By': c.added_by_name ?? '', Date: fmtDate(c.created_at) }))),
-    },
-    { name: 'Audit Trail', rows: timeline },
-  ]);
-}
-/** Opens the printable statement (same form layout as the shop's invoices) in a new tab. */
 function printSummary() {
   if (!result.value) return;
   try {
@@ -165,7 +120,7 @@ function printSummary() {
             <li><b>Type your full plate number</b><span>Exactly as it appears on the plate, e.g. <code>ABC1234</code> or <code>NCK123</code>. Letters and numbers only.</span></li>
             <li><b>Add the first 4 characters of your VIN</b><span>Your VIN (chassis number) is on the OR/CR, on the metal plate at the base of the windshield, or on the door-jamb sticker. Only the first four are needed — e.g. <code>WBA3</code>.</span></li>
             <li><b>Press “View my history”</b><span>You'll see every job order for the vehicle: the complaint, our findings, photos and videos, each part and labor charge, who did the work and when.</span></li>
-            <li><b>Download your summary</b><span>Export an Excel workbook with the full audit trail, or save the page as a PDF for your records.</span></li>
+            <li><b>Download your statement</b><span>Save a PDF service statement — every visit in full, in the shop's document format — for your records.</span></li>
           </ol>
           <p class="help">Can't find your vehicle? Make sure both fields match the documents. After several failed attempts the search pauses for an hour — call the shop and we'll help.</p>
         </div>
@@ -182,7 +137,6 @@ function printSummary() {
             </div>
           </div>
           <div class="row no-print">
-            <button class="btn success" @click="downloadSummary">⇩ Excel · summary & audit trail</button>
             <button class="btn" @click="printSummary">🖨 PDF · full statement</button>
             <button class="btn ghost" @click="reset">New search</button>
           </div>
@@ -236,11 +190,6 @@ function printSummary() {
               <section class="block">
                 <h3>Customer complaint</h3>
                 <p>{{ j.complaints.join(', ') || '—' }}</p>
-              </section>
-
-              <section v-if="j.repairs.length" class="block">
-                <h3>Repairs executed</h3>
-                <ol class="repairs"><li v-for="(r, i) in j.repairs" :key="i">{{ r }}</li></ol>
               </section>
 
               <section class="block">
