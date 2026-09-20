@@ -1,6 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 
-export const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY);
+const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const key = import.meta.env.VITE_SUPABASE_KEY as string | undefined;
+/** True when the build was made without VITE_SUPABASE_URL / VITE_SUPABASE_KEY (e.g. host env vars not set). */
+export const isConfigured = !!url && !!key;
+// A placeholder client keeps the app mountable so the misconfiguration can be shown instead of a blank page.
+export const supabase = createClient(url || 'https://not-configured.supabase.co', key || 'not-configured');
 
 /** Short-lived URL for a private media object; cached per path for the session. */
 const urlCache = new Map<string, { url: string; exp: number }>();

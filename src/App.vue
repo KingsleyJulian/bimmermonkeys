@@ -3,6 +3,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuth } from '@/stores/auth';
 import { toasts } from '@/lib/toast';
 import ThemeToggle from '@/components/ThemeToggle.vue';
+import { isConfigured } from '@/lib/supabase';
 
 const auth = useAuth();
 const route = useRoute();
@@ -26,7 +27,16 @@ async function signOut() {
 </script>
 
 <template>
-  <div v-if="route.meta.public || route.meta.print || !auth.isAdmin">
+  <div v-if="!isConfigured" class="login">
+    <div class="card" style="text-transform: none">
+      <h2>Console not configured</h2>
+      <p style="color: var(--text-muted)">This build has no Supabase settings. Set these environment variables on the host (e.g. Vercel → Project → Settings → Environment Variables) and redeploy:</p>
+      <pre class="card" style="padding: 12px; font-size: 12px; overflow: auto">VITE_SUPABASE_URL=https://&lt;project-ref&gt;.supabase.co
+VITE_SUPABASE_KEY=sb_publishable_...</pre>
+      <p class="help">Vite bakes these in at build time, so they must exist before the build runs.</p>
+    </div>
+  </div>
+  <div v-else-if="route.meta.public || route.meta.print || !auth.isAdmin">
     <router-view />
   </div>
   <div v-else class="shell">

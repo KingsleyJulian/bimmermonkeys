@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuth } from '@/stores/auth';
+import { isConfigured } from '@/lib/supabase';
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -22,6 +23,7 @@ export const router = createRouter({
 });
 
 router.beforeEach(async (to) => {
+  if (!isConfigured) return true; // App.vue shows the configuration notice.
   const auth = useAuth();
   if (!auth.ready) await auth.init();
   if (to.meta.portal) return true;
