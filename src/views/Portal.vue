@@ -330,9 +330,12 @@ function printSummary() {
 .hero h1 { font-size: 30px; text-align: center; margin-top: 18px; }
 .lead { text-align: center; color: var(--text-muted); max-width: 640px; margin: 10px auto 26px; font-size: 15px; }
 .lookup { max-width: 860px; margin: 0 auto; }
-.lookup-grid { display: grid; grid-template-columns: 1.2fr 1fr auto; gap: 14px; align-items: end; }
-.lookup .input { font-size: 20px; padding: 14px 16px; }
-.lookup-btn { height: 54px; padding: 0 22px; }
+/* Labels, inputs and help text sit on three shared baselines regardless of how long each help text runs. */
+.lookup-grid { display: grid; grid-template-columns: 1.2fr 1fr auto; gap: 14px; align-items: start; }
+.lookup .field label { min-height: 14px; line-height: 14px; }
+.lookup .input { font-size: 20px; padding: 14px 16px; height: 54px; }
+.lookup .help { min-height: 30px; line-height: 1.4; }
+.lookup-btn { height: 54px; padding: 0 22px; margin-top: 20px; }
 .guide { max-width: 860px; margin: 30px auto 0; }
 .guide h2 { font-size: 14px; color: var(--text-muted); letter-spacing: 0.1em; margin-bottom: 12px; }
 .steps { list-style: none; counter-reset: step; padding: 0; margin: 0 0 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
@@ -385,6 +388,8 @@ function printSummary() {
 
 @media (max-width: 760px) {
   .lookup-grid, .steps, .two, .stats { grid-template-columns: 1fr; }
+  .lookup-btn { margin-top: 0; width: 100%; }
+  .lookup .help { min-height: 0; }
   .hero h1 { font-size: 24px; }
   .portal-head { padding: 12px 16px; }
 }
