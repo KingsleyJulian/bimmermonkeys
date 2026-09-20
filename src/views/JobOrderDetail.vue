@@ -15,6 +15,9 @@ import type { PartRequestRow } from '@/lib/parts';
 import { supabase } from '@/lib/supabase';
 import { fmtDate, statusLabel, statusTone } from '@/lib/format';
 import { INSPECTION_GROUPS, ITEM_LABELS } from '@/lib/inspection';
+import { reasonDialog } from '@/lib/swal';
+import { toast } from '@/lib/toast';
+import { useAuth } from '@/stores/auth';
 
 type Jo = {
   id: string; jo_number: string; local_ref: string; status: string; category: string; entry_type: string; odometer_km: number;
@@ -42,6 +45,43 @@ const charges = ref<ChargeRow[]>([]);
 const addParts = ref(false);
 const addCharges = ref(false);
 const chargesTotal = () => charges.value.reduce((n, c) => n + Number(c.total), 0);
+const auth = useAuth();
+
+/** Reduce or remove lines. Removal is a soft delete; both are written to the job order audit trail by the database. */
+async function setPartQty(p: PartRequestRow, qty: number) {
+  qty = Math.max(1, Math.floor(qty));
+  if (qty === p.quantity) return;
+  const { error } = await supabase.from('part_requests').update({ quantity: qty }).eq('id', p.id);
+  if (error) return toast.error(error.message);
+  p.quantity = qty;
+}
+async function removePart(p: PartRequestRow) {
+  const reason = await reasonDialog('Remove this part?', `<b>${p.part_name}</b> × ${p.quantity}<br/><small>The request is marked CANCELLED; if it was already installed the stock goes back. Logged in the audit trail.</small>`);
+  if (reason === null) return;
+  const { error } = await supabase.from('part_requests').update({ status: 'CANCELLED', cancel_reason: reason || null }).eq('id', p.id);
+  if (error) return toast.error(error.message);
+  toast.success('Part removed');
+  load();
+}
+async function setChargeQty(c: ChargeRow, qty: number) {
+  qty = Math.max(0.25, Math.round(qty * 100) / 100);
+  if (qty === Number(c.quantity)) return;
+  const { error } = await supabase.from('job_order_charges').update({ quantity: qty }).eq('id', c.id);
+  if (error) return toast.error(error.message);
+  c.quantity = qty;
+  c.total = Math.round(qty * Number(c.unit_amount) * 100) / 100;
+}
+async function removeCharge(c: ChargeRow) {
+  const reason = await reasonDialog('Remove this charge?', `<b>${c.name}</b> · ${c.quantity} ${c.unit} × ₱${fmtMoney(c.unit_amount)}<br/><small>It disappears from the invoice; the removal is logged in the audit trail.</small>`);
+  if (reason === null) return;
+  const { error } = await supabase
+    .from('job_order_charges')
+    .update({ removed_at: new Date().toISOString(), removed_by: auth.profile?.id ?? null, removed_by_name: auth.profile?.display_name ?? null, removed_reason: reason || null })
+    .eq('id', c.id);
+  if (error) return toast.error(error.message);
+  toast.success('Charge removed');
+  load();
+}
 const statusLog = ref<{ id: number; old_status: string | null; new_status: string; changed_by_name: string | null; changed_at: string }[]>([]);
 
 const byKey = computed(() => new Map(inspection.value.map((i) => [i.item_key, i])));
@@ -63,7 +103,7 @@ async function load() {
     supabase.from('job_orders').select('id, jo_number, status, category, odometer_km, created_at').eq('vehicle_id', jo.value.vehicle_id).order('created_at', { ascending: false }),
     supabase.from('job_order_status_log').select('id, old_status, new_status, changed_by_name, changed_at').eq('job_order_id', id).order('changed_at', { ascending: false }),
     supabase.from('part_requests').select('*').eq('job_order_id', id).order('created_at'),
-    supabase.from('job_order_charges').select('*').eq('job_order_id', id).order('created_at'),
+    supabase.from('job_order_charges').select('*').eq('job_order_id', id).is('removed_at', null).order('created_at'),
   ]);
   inspection.value = (i.data as Insp[]) ?? [];
   complaints.value = ((c.data as { keyword: string }[]) ?? []).map((x) => x.keyword);
@@ -144,15 +184,21 @@ watch(() => route.params.id, () => { tab.value = 'info'; load(); });
         <div class="row between"><h3>Parts requested · {{ partRequests.length }}</h3><button class="btn sm" @click="addParts = true">+ Add parts</button></div>
         <div class="table-wrap mt">
           <table>
-            <thead><tr><th></th><th>Status</th><th>Part</th><th>Part number</th><th class="num">Qty</th><th>Requested by</th><th>When</th></tr></thead>
+            <thead><tr><th></th><th>Status</th><th>Part</th><th>Part number</th><th class="num">Qty</th><th>Requested by</th><th>When</th><th></th></tr></thead>
             <tbody>
               <tr v-for="p in partRequests" :key="p.id">
                 <td style="width: 48px"><img v-if="partImageUrl(p.image_path)" :src="partImageUrl(p.image_path)!" alt="" style="width: 40px; height: 40px; border-radius: 8px; object-fit: cover; display: block" /></td>
                 <td><PartRequestStatus :id="p.id" :status="p.status" :label="p.part_name" @changed="(s) => (p.status = s)" /></td>
                 <td><b>{{ p.part_name }}</b><span v-if="!p.part_id" class="badge warn" style="margin-left: 6px">Not in catalogue</span></td>
-                <td class="mono">{{ p.part_number }}</td><td class="num">{{ p.quantity }}</td><td>{{ p.requested_by_name ?? '—' }}</td><td>{{ fmtDate(p.created_at) }}</td>
+                <td class="mono">{{ p.part_number }}</td>
+                <td class="num">
+                  <div v-if="p.status !== 'CANCELLED'" class="qty"><button class="btn sm ghost" title="Decrease" @click="setPartQty(p, p.quantity - 1)">−</button><b>{{ p.quantity }}</b><button class="btn sm ghost" title="Increase" @click="setPartQty(p, p.quantity + 1)">+</button></div>
+                  <span v-else>{{ p.quantity }}</span>
+                </td>
+                <td>{{ p.requested_by_name ?? '—' }}</td><td>{{ fmtDate(p.created_at) }}</td>
+                <td class="num"><button v-if="p.status !== 'CANCELLED'" class="btn sm ghost danger-text" title="Remove" @click="removePart(p)">✕ Remove</button></td>
               </tr>
-              <tr v-if="!partRequests.length"><td colspan="7" class="dim">No parts requested</td></tr>
+              <tr v-if="!partRequests.length"><td colspan="8" class="dim">No parts requested</td></tr>
             </tbody>
           </table>
         </div>
@@ -162,13 +208,15 @@ watch(() => route.params.id, () => { tab.value = 'info'; load(); });
         <div class="row between"><h3>Labor & charges · ₱ {{ fmtMoney(chargesTotal()) }}</h3><button class="btn sm" @click="addCharges = true">+ Add charges</button></div>
         <div class="table-wrap mt">
           <table>
-            <thead><tr><th>Code</th><th>Service</th><th>Unit</th><th class="num">Qty</th><th class="num">Unit amount</th><th class="num">Total</th><th>Added by</th><th>When</th></tr></thead>
+            <thead><tr><th>Code</th><th>Service</th><th>Unit</th><th class="num">Qty</th><th class="num">Unit amount</th><th class="num">Total</th><th>Added by</th><th>When</th><th></th></tr></thead>
             <tbody>
               <tr v-for="c in charges" :key="c.id">
                 <td class="mono">{{ c.code }}</td><td><b>{{ c.name }}</b><span v-if="c.is_manual" class="badge" style="margin-left: 6px">Manual</span></td><td>{{ c.unit }}</td>
-                <td class="num">{{ c.quantity }}</td><td class="num">{{ fmtMoney(c.unit_amount) }}</td><td class="num"><b>{{ fmtMoney(c.total) }}</b></td><td>{{ c.added_by_name ?? '—' }}</td><td>{{ fmtDate(c.created_at) }}</td>
+                <td class="num"><div class="qty"><button class="btn sm ghost" title="Decrease" @click="setChargeQty(c, Number(c.quantity) - 1)">−</button><b>{{ c.quantity }}</b><button class="btn sm ghost" title="Increase" @click="setChargeQty(c, Number(c.quantity) + 1)">+</button></div></td>
+                <td class="num">{{ fmtMoney(c.unit_amount) }}</td><td class="num"><b>{{ fmtMoney(c.total) }}</b></td><td>{{ c.added_by_name ?? '—' }}</td><td>{{ fmtDate(c.created_at) }}</td>
+                <td class="num"><button class="btn sm ghost danger-text" title="Remove" @click="removeCharge(c)">✕ Remove</button></td>
               </tr>
-              <tr v-if="!charges.length"><td colspan="8" class="dim">No charges yet</td></tr>
+              <tr v-if="!charges.length"><td colspan="9" class="dim">No charges yet</td></tr>
             </tbody>
           </table>
         </div>

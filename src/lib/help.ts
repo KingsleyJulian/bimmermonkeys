@@ -37,6 +37,7 @@ export const HELP: Record<string, HelpTopic> = {
       { label: '+ Add parts', text: 'Pick parts from the catalogue (with photos) or type a manual part; several can be added at once. Each becomes a tracked request.' },
       { label: '+ Add charges', text: 'Labor, parking and fees from the Charges price list, or a manual line with your own amount. These print on the invoices and total up automatically.' },
       { label: '+ Add report', text: 'Diagnostic findings with time and technician, plus photos/videos. Reports appear in the history trail of this job order.' },
+      { label: '− / + and ✕ Remove', text: 'On the parts and charges tables: change a quantity with the stepper, or remove a line (a reason can be given). Removed parts become CANCELLED (stock is restored if they were installed); removed charges leave the invoice. Every change is written to the job order audit trail with your name.' },
       { label: 'Inspection', text: 'The checklist as recorded on intake. NOT OK items show the remarks and the photos/videos taken.' },
       { label: 'Print', text: 'Choose any of the documents; stage-appropriate ones are suggested first.' },
       { label: 'Vehicle profile', text: 'Opens the vehicle page with its full service history.' },

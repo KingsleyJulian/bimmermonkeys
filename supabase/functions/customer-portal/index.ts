@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
     admin.from("reports").select("id, job_order_id, body, author_name, created_at").in("job_order_id", ids).order("created_at"),
     admin.from("media_attachments").select("id, job_order_id, report_id, inspection_item_key, kind, storage_path, thumbnail_path, mime_type, captured_at, captured_by_name, sort_order").in("job_order_id", ids).order("sort_order"),
     admin.from("part_requests").select("id, job_order_id, part_number, part_name, quantity, status, requested_by_name, created_at, stock_deducted_at, image_path, parts(srp)").in("job_order_id", ids).order("created_at"),
-    admin.from("job_order_charges").select("id, job_order_id, name, unit, quantity, unit_amount, total, added_by_name, created_at").in("job_order_id", ids).order("created_at"),
+    admin.from("job_order_charges").select("id, job_order_id, name, unit, quantity, unit_amount, total, added_by_name, created_at").in("job_order_id", ids).is("removed_at", null).order("created_at"),
     admin.from("job_order_status_log").select("job_order_id, old_status, new_status, changed_by_name, changed_at").in("job_order_id", ids).order("changed_at"),
     admin.from("job_order_repairs").select("job_order_id, line_no, description, created_by_name, created_at").in("job_order_id", ids).order("line_no"),
     admin.from("job_order_audit").select("job_order_id, action, new_value, changed_by_name, changed_at").in("job_order_id", ids).order("changed_at"),

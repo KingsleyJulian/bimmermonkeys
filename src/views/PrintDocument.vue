@@ -86,7 +86,7 @@ onMounted(async () => {
     supabase.from('inspection_items').select('item_key, state, quantity, remark').eq('job_order_id', id),
     supabase.from('complaints').select('keyword').eq('job_order_id', id).order('position'),
     supabase.from('part_requests').select('id, part_id, part_number, part_name, quantity, status, parts(srp)').eq('job_order_id', id).order('created_at'),
-    supabase.from('job_order_charges').select('*').eq('job_order_id', id).order('created_at'),
+    supabase.from('job_order_charges').select('*').eq('job_order_id', id).is('removed_at', null).order('created_at'),
     supabase.from('shop_settings').select('key, value'),
     supabase.from('document_signatories').select('label, name').eq('document_kind', KIND_TO_DB[kind]).order('sort_order'),
     supabase.from('job_order_status_log').select('new_status, changed_at').eq('job_order_id', id).in('new_status', ['COMPLETED', 'RELEASED']).order('changed_at', { ascending: false }).limit(1),

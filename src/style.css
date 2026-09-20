@@ -153,6 +153,10 @@ textarea.input { min-height: 96px; resize: vertical; }
 .help { font-size: 11px; color: var(--text-dim); }
 .err { font-size: 11px; color: var(--m-red); }
 .mb { margin-bottom: 14px; }
+.qty { display: inline-flex; align-items: center; gap: 2px; }
+.qty b { min-width: 28px; text-align: center; }
+.qty .btn { width: 26px; height: 26px; padding: 0; font-size: 14px; }
+.danger-text { color: var(--m-red) !important; }
 .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .row.end { justify-content: flex-end; }
 .row.between { justify-content: space-between; }

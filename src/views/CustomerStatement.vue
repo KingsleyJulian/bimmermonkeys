@@ -105,9 +105,9 @@ const closeWindow = () => window.close();
         </tbody>
       </table>
 
-      <!-- One job order per page, in full. -->
+      <!-- Job orders flow one after another; sections never split away from their band. -->
       <template v-for="(j, idx) in data.jobOrders" :key="j.id">
-        <div class="pagebreak" />
+        <div class="jo-gap" />
         <h2 class="subtitle"><span>JOB ORDER {{ j.jo_number }} <span class="docno">· {{ statusLabel(j.status).toUpperCase() }}</span></span><span class="pageof">{{ idx + 1 }} OF {{ data.jobOrders.length }} · {{ data.vehicle.plate }}</span></h2>
 
         <table class="form hdr">
@@ -241,7 +241,8 @@ const closeWindow = () => window.close();
 .form .muted { color: #777; }
 .foot { margin-top: 6px; text-align: center; font-size: 8px; color: #666; }
 
-.pagebreak { page-break-before: always; break-before: page; height: 0; margin-top: 16px; }
+.jo-gap { height: 14px; }
+.subtitle, .band { break-after: avoid; page-break-after: avoid; }
 .photos { border: 1px solid #111; padding: 6px; margin-bottom: 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .photos figure { margin: 0; page-break-inside: avoid; break-inside: avoid; text-align: center; }
 .photos img { width: 100%; height: 42mm; object-fit: cover; border: 1px solid #111; background: #000; }
@@ -253,6 +254,8 @@ const closeWindow = () => window.close();
   .sheet { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
   .band, .form tr.head td, .photos img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .form tr, .photos figure { break-inside: avoid; page-break-inside: avoid; }
+  .form thead, .form tr.head { break-after: avoid; }
+  .jo-gap { height: 8mm; }
   @page { size: A4; margin: 10mm; }
 }
 </style>
