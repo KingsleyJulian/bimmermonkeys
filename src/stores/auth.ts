@@ -14,7 +14,9 @@ export const useAuth = defineStore('auth', {
     async init() {
       const { data } = await supabase.auth.getSession();
       await this.apply(data.session);
-      supabase.auth.onAuthStateChange((_e, session) => {
+      supabase.auth.onAuthStateChange((event, session) => {
+        // SIGNED_IN is handled by signIn() itself (awaited); reacting here too would race it.
+        if (event === 'SIGNED_IN') return;
         this.apply(session);
       });
       this.ready = true;
@@ -28,9 +30,11 @@ export const useAuth = defineStore('auth', {
       const { data } = await supabase.from('profiles').select('id, display_name, role, is_active').eq('id', session.user.id).maybeSingle();
       this.profile = (data as Profile) ?? null;
     },
+    /** Signs in AND loads the profile before returning, so callers can check the role right away. */
     async signIn(email: string, password: string) {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
       if (error) throw new Error(error.message);
+      await this.apply(data.session);
     },
     async signOut() {
       await supabase.auth.signOut();
