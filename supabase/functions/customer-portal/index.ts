@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
   const ids = (jos ?? []).map((j) => j.id);
   if (!ids.length) return json({ vehicle: { ...vehicle, vin: mask(vehicle.vin), engine_no: mask(vehicle.engine_no) }, jobOrders: [] });
 
-  const [complaints, reports, media, parts, charges, statusLog, repairs, audit] = await Promise.all([
+  const [complaints, reports, media, parts, charges, statusLog, repairs, audit, shopRows] = await Promise.all([
     admin.from("complaints").select("job_order_id, keyword, position").in("job_order_id", ids).order("position"),
     admin.from("reports").select("id, job_order_id, body, author_name, created_at").in("job_order_id", ids).order("created_at"),
     admin.from("media_attachments").select("id, job_order_id, report_id, inspection_item_key, kind, storage_path, thumbnail_path, mime_type, captured_at, captured_by_name, sort_order").in("job_order_id", ids).order("sort_order"),
@@ -81,7 +81,9 @@ Deno.serve(async (req) => {
     admin.from("job_order_status_log").select("job_order_id, old_status, new_status, changed_by_name, changed_at").in("job_order_id", ids).order("changed_at"),
     admin.from("job_order_repairs").select("job_order_id, line_no, description, created_by_name, created_at").in("job_order_id", ids).order("line_no"),
     admin.from("job_order_audit").select("job_order_id, action, new_value, changed_by_name, changed_at").in("job_order_id", ids).order("changed_at"),
+    admin.from("shop_settings").select("key, value").in("key", ["shop_name", "shop_address", "shop_phone", "shop_email"]),
   ]);
+  const shop = Object.fromEntries((shopRows.data ?? []).map((r) => [r.key, r.value]));
 
   // Signed URLs for the private media bucket (thumbnails too), one batch call.
   const paths = Array.from(new Set((media.data ?? []).flatMap((m) => [m.storage_path, m.thumbnail_path]).filter((p): p is string => !!p)));
@@ -152,6 +154,7 @@ Deno.serve(async (req) => {
   return json({
     vehicle: { ...vehicle, vin: mask(vehicle.vin), engine_no: mask(vehicle.engine_no) },
     jobOrders,
+    shop,
     generated_at: new Date().toISOString(),
     media_expires_in: SIGNED_URL_TTL,
   });

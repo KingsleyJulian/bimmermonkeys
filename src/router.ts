@@ -8,6 +8,7 @@ export const router = createRouter({
     { path: '/login', component: () => import('@/views/Login.vue'), meta: { public: true } },
     // Customer-facing homepage: anyone can look a vehicle up; staff sign in from here.
     { path: '/', component: () => import('@/views/Portal.vue'), meta: { public: true, portal: true } },
+    { path: '/statement', component: () => import('@/views/CustomerStatement.vue'), meta: { public: true, portal: true, print: true } },
     { path: '/dashboard', component: () => import('@/views/Dashboard.vue') },
     { path: '/job-orders', component: () => import('@/views/JobOrders.vue') },
     { path: '/job-orders/:id', component: () => import('@/views/JobOrderDetail.vue') },
